@@ -1,3 +1,4 @@
+import base64
 import binascii
 import glob
 import math
@@ -855,6 +856,7 @@ root = CLITree(root=True)
 hw = root.subgroup("hw", "Hardware-related commands")
 hw_slot = hw.subgroup("slot", "Emulation slots commands")
 hw_settings = hw.subgroup("settings", "Chameleon settings commands")
+hw_findmy = hw.subgroup("findmy", "Apple FindMy / offline-finding beacon")
 
 hf = root.subgroup("hf", "High Frequency commands")
 hf_14a = hf.subgroup("14a", "ISO14443-a commands")
@@ -7288,6 +7290,69 @@ class HWSettingsBLEKey(DeviceRequiredUnit):
                 print(
                     f" - {color_string((CR, 'Only 6 ASCII characters from 0 to 9 are supported.'))}"
                 )
+
+
+def _parse_findmy_key(raw: str) -> bytes:
+    """Parse a 28-byte FindMy public key given as base64 or hex."""
+    s = raw.strip()
+    # Try base64 first (how Macless-Haystack exports the advertisement key).
+    try:
+        key = base64.b64decode(s, validate=True)
+        if len(key) == 28:
+            return key
+    except (binascii.Error, ValueError):
+        pass
+    # Fall back to hex (allow spaces / colons).
+    hexs = re.sub(r'[\s:]', '', s)
+    try:
+        key = bytes.fromhex(hexs)
+        if len(key) == 28:
+            return key
+    except ValueError:
+        pass
+    raise ValueError("Key must decode to exactly 28 bytes (base64 or hex)")
+
+
+@hw_findmy.command("beacon")
+class HWFindMyBeacon(DeviceRequiredUnit):
+
+    def args_parser(self) -> ArgumentParserNoExit:
+        parser = ArgumentParserNoExit()
+        parser.description = ('Configure the Apple FindMy / offline-finding beacon. '
+                              'Provision a public key with -k, then start it with -e. '
+                              'With no arguments, shows the current beacon status.')
+        parser.add_argument('-k', '--key', required=False,
+                            help="28-byte offline-finding public key (base64 or hex)")
+        set_group = parser.add_mutually_exclusive_group()
+        set_group.add_argument('-e', '--enable', action='store_true', help="Start the beacon")
+        set_group.add_argument('-d', '--disable', action='store_true', help="Stop the beacon")
+        return parser
+
+    def on_exec(self, args: argparse.Namespace):
+        enabled_str = color_string((CG, "advertising"))
+        disabled_str = color_string((CR, "stopped"))
+
+        if args.key is not None:
+            try:
+                key = _parse_findmy_key(args.key)
+            except ValueError as e:
+                print(f" - {color_string((CR, str(e)))}")
+                return
+            self.cmd.findmy_set_key(key)
+            print(f" - Public key provisioned ({len(key)} bytes).")
+
+        if args.enable:
+            self.cmd.findmy_set_enable(True)
+            print(f" - FindMy beacon is now {enabled_str}.")
+            print(color_string((CY, "Note: normal BLE (GUI/CLI over Bluetooth) is suspended while the beacon runs.")))
+        elif args.disable:
+            self.cmd.findmy_set_enable(False)
+            print(f" - FindMy beacon is now {disabled_str}.")
+
+        is_running = self.cmd.findmy_get_enable()
+        if is_running.status == Status.SUCCESS:
+            state = enabled_str if is_running.parsed else disabled_str
+            print(f" - Beacon status: {state}")
 
 
 @hw_settings.command("blepair")

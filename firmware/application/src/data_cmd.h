@@ -48,6 +48,9 @@
 #define DATA_CMD_GET_ALL_SLOT_NICKS             (1038)
 #define DATA_CMD_GET_SLEEP_TIMEOUT              (1039)
 #define DATA_CMD_SET_SLEEP_TIMEOUT              (1040)
+#define DATA_CMD_FINDMY_SET_KEY                 (1041)
+#define DATA_CMD_FINDMY_SET_ENABLE              (1042)
+#define DATA_CMD_FINDMY_GET_ENABLE              (1043)
 
 //
 // ******************************************************************

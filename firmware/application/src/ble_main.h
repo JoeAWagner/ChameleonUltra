@@ -14,6 +14,8 @@ typedef void (*lf_adc_callback_t)(nrf_saadc_value_t *, size_t);
 void ble_slave_init(void);
 void advertising_start(bool erase_bonds);
 void advertising_stop(void);
+uint32_t ble_findmy_advertising_start(const uint8_t *addr6, const uint8_t *advdata, uint8_t advdata_len);
+uint32_t ble_findmy_advertising_stop(void);
 void delete_bonds_all(void);
 void nus_data_response(uint8_t *p_data, uint16_t length);
 bool is_nus_working(void);

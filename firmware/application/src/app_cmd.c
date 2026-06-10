@@ -4,6 +4,7 @@
 #include "usb_main.h"
 #include "rfid_main.h"
 #include "ble_main.h"
+#include "findmy.h"
 #include "syssleep.h"
 #include "hex_utils.h"
 #include "data_cmd.h"
@@ -234,6 +235,36 @@ static data_frame_tx_t *cmd_processor_set_ble_pairing_enable(uint16_t cmd, uint1
     }
     settings_set_ble_pairing_enable(data[0]);
     return data_frame_make(cmd, STATUS_SUCCESS, 0, NULL);
+}
+
+static data_frame_tx_t *cmd_processor_findmy_set_key(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data) {
+    if (length != FINDMY_PUBKEY_LEN) {
+        return data_frame_make(cmd, STATUS_PAR_ERR, 0, NULL);
+    }
+    findmy_set_key(data);
+    return data_frame_make(cmd, STATUS_SUCCESS, 0, NULL);
+}
+
+static data_frame_tx_t *cmd_processor_findmy_set_enable(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data) {
+    if (length != 1 || data[0] > 1) {
+        return data_frame_make(cmd, STATUS_PAR_ERR, 0, NULL);
+    }
+    uint32_t err;
+    if (data[0]) {
+        if (!findmy_has_key()) {
+            // Refuse to start a beacon with no key provisioned.
+            return data_frame_make(cmd, STATUS_PAR_ERR, 0, NULL);
+        }
+        err = findmy_start();
+    } else {
+        err = findmy_stop();
+    }
+    return data_frame_make(cmd, err == NRF_SUCCESS ? STATUS_SUCCESS : STATUS_CMD_ERR, 0, NULL);
+}
+
+static data_frame_tx_t *cmd_processor_findmy_get_enable(uint16_t cmd, uint16_t status, uint16_t length, uint8_t *data) {
+    uint8_t running = findmy_is_running() ? 1 : 0;
+    return data_frame_make(cmd, STATUS_SUCCESS, 1, &running);
 }
 
 #if defined(PROJECT_CHAMELEON_ULTRA)
@@ -2968,6 +2999,9 @@ static cmd_data_map_t m_data_cmd_map[] = {
     {    DATA_CMD_GET_SLEEP_TIMEOUT,            NULL,                        cmd_processor_get_sleep_timeout,             NULL                   },
     {    DATA_CMD_SET_SLEEP_TIMEOUT,            NULL,                        cmd_processor_set_sleep_timeout,             NULL                   },
     {    DATA_CMD_GET_ALL_SLOT_NICKS,           NULL,                        cmd_processor_get_all_slot_nicks,            NULL                   },
+    {    DATA_CMD_FINDMY_SET_KEY,               NULL,                        cmd_processor_findmy_set_key,                NULL                   },
+    {    DATA_CMD_FINDMY_SET_ENABLE,            NULL,                        cmd_processor_findmy_set_enable,             NULL                   },
+    {    DATA_CMD_FINDMY_GET_ENABLE,            NULL,                        cmd_processor_findmy_get_enable,             NULL                   },
 
 #if defined(PROJECT_CHAMELEON_ULTRA)
 

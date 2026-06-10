@@ -608,6 +608,100 @@ void advertising_stop(void) {
     sd_ble_gap_adv_stop(m_advertising.adv_handle);
 }
 
+// ===========================================================================
+// FindMy / Apple offline-finding beacon
+//
+// Reuses the single advertising set owned by the Nordic advertising module so
+// we stay within the default SoftDevice adv-set budget. Enabling the beacon
+// stops the normal connectable advertising, swaps the GAP address for the
+// key-derived random-static address, and starts non-connectable advertising.
+// Disabling restores the saved address and the normal advertising.
+// ===========================================================================
+#define FINDMY_ADV_INTERVAL  MSEC_TO_UNITS(2000, UNIT_0_625_MS)  // 2 s, AirTag-like
+
+static uint8_t          m_findmy_adv_buf[BLE_GAP_ADV_SET_DATA_SIZE_MAX];
+static ble_gap_adv_data_t m_findmy_adv_data;
+static ble_gap_addr_t   m_saved_addr;
+static bool             m_findmy_addr_saved = false;
+static bool             m_findmy_active = false;
+
+uint32_t ble_findmy_advertising_start(const uint8_t *addr6, const uint8_t *advdata, uint8_t advdata_len) {
+    ret_code_t err_code;
+
+    if (advdata_len > sizeof(m_findmy_adv_buf)) {
+        return NRF_ERROR_DATA_SIZE;
+    }
+    // Changing the GAP address is rejected while a connection is up.
+    if (g_is_ble_connected) {
+        return NRF_ERROR_INVALID_STATE;
+    }
+
+    // Stop the normal connectable advertising so we can reconfigure the set.
+    (void) sd_ble_gap_adv_stop(m_advertising.adv_handle);
+
+    // Preserve the current address so we can restore it when the beacon stops.
+    if (!m_findmy_addr_saved) {
+        err_code = sd_ble_gap_addr_get(&m_saved_addr);
+        if (err_code != NRF_SUCCESS) {
+            return err_code;
+        }
+        m_findmy_addr_saved = true;
+    }
+
+    ble_gap_addr_t addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.addr_type = BLE_GAP_ADDR_TYPE_RANDOM_STATIC;
+    memcpy(addr.addr, addr6, BLE_GAP_ADDR_LEN);
+    err_code = sd_ble_gap_addr_set(&addr);
+    if (err_code != NRF_SUCCESS) {
+        return err_code;
+    }
+
+    // SoftDevice keeps a reference to the buffer, so copy into our static store.
+    memcpy(m_findmy_adv_buf, advdata, advdata_len);
+    memset(&m_findmy_adv_data, 0, sizeof(m_findmy_adv_data));
+    m_findmy_adv_data.adv_data.p_data = m_findmy_adv_buf;
+    m_findmy_adv_data.adv_data.len    = advdata_len;
+
+    ble_gap_adv_params_t params;
+    memset(&params, 0, sizeof(params));
+    params.properties.type = BLE_GAP_ADV_TYPE_NONCONNECTABLE_NONSCANNABLE_UNDIRECTED;
+    params.p_peer_addr     = NULL;
+    params.filter_policy   = BLE_GAP_ADV_FP_ANY;
+    params.interval        = FINDMY_ADV_INTERVAL;
+    params.duration        = 0;  // advertise indefinitely
+    params.primary_phy     = BLE_GAP_PHY_1MBPS;
+
+    err_code = sd_ble_gap_adv_set_configure(&m_advertising.adv_handle, &m_findmy_adv_data, &params);
+    if (err_code != NRF_SUCCESS) {
+        return err_code;
+    }
+
+    err_code = sd_ble_gap_adv_start(m_advertising.adv_handle, APP_BLE_CONN_CFG_TAG);
+    if (err_code == NRF_SUCCESS) {
+        m_findmy_active = true;
+    }
+    return err_code;
+}
+
+uint32_t ble_findmy_advertising_stop(void) {
+    if (!m_findmy_active) {
+        return NRF_SUCCESS;
+    }
+
+    (void) sd_ble_gap_adv_stop(m_advertising.adv_handle);
+    m_findmy_active = false;
+
+    // Restore the original BLE address before bringing normal advertising back.
+    if (m_findmy_addr_saved) {
+        (void) sd_ble_gap_addr_set(&m_saved_addr);
+        m_findmy_addr_saved = false;
+    }
+
+    advertising_start(false);
+    return NRF_SUCCESS;
+}
+
 /**@brief Function for handling Peer Manager events.
  *
  * @param[in] p_evt  Peer Manager event.

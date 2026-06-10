@@ -1765,6 +1765,29 @@ class ChameleonCMD:
         return self.device.send_cmd_sync(Command.SET_BLE_PAIRING_ENABLE, data)
 
     @expect_response(Status.SUCCESS)
+    def findmy_set_key(self, pubkey: bytes):
+        """
+        Provision the 28-byte Apple offline-finding (FindMy) public key.
+        """
+        if len(pubkey) != 28:
+            raise ValueError("FindMy public key must be 28 bytes")
+        return self.device.send_cmd_sync(Command.FINDMY_SET_KEY, pubkey)
+
+    @expect_response(Status.SUCCESS)
+    def findmy_set_enable(self, enabled: bool):
+        data = struct.pack('!B', enabled)
+        return self.device.send_cmd_sync(Command.FINDMY_SET_ENABLE, data)
+
+    def findmy_get_enable(self):
+        """
+        :return: True if the FindMy beacon is currently advertising.
+        """
+        resp = self.device.send_cmd_sync(Command.FINDMY_GET_ENABLE)
+        if resp.status == Status.SUCCESS:
+            resp.parsed, = struct.unpack('!?', resp.data)
+        return resp
+
+    @expect_response(Status.SUCCESS)
     def mf1_get_field_off_do_reset(self):
         resp = self.device.send_cmd_sync(Command.MF1_GET_FIELD_OFF_DO_RESET)
         if resp.status == Status.SUCCESS:
