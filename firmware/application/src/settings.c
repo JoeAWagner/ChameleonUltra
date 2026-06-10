@@ -58,6 +58,12 @@ void settings_init_sleep_timeout_config(void) {
     config.sleep_timeout = SETTINGS_SLEEP_TIMEOUT_DEFAULT_S;
 }
 
+// add on version7
+void settings_init_findmy_config(void) {
+    config.findmy_enable = false;
+    memset(config.findmy_key, 0, SETTINGS_FINDMY_KEY_LEN);
+}
+
 void settings_init_config(void) {
     settings_update_version_for_config();
     config.animation_config = SettingsAnimationModeFull; // add on version1
@@ -66,6 +72,7 @@ void settings_init_config(void) {
     settings_init_ble_connect_key_config();
     settings_init_ble_pairing_enable_config();
     settings_init_sleep_timeout_config();
+    settings_init_findmy_config();
 }
 
 void settings_migrate(void) {
@@ -88,6 +95,9 @@ void settings_migrate(void) {
 
         case 5:
             settings_init_sleep_timeout_config();
+
+        case 6:
+            settings_init_findmy_config();
 
             /*
              * Add new migration steps ABOVE THIS COMMENT
@@ -307,4 +317,20 @@ uint32_t settings_get_sleep_timeout(void) {
 
 void settings_set_sleep_timeout(uint8_t seconds) {
     config.sleep_timeout = seconds;
+}
+
+bool settings_get_findmy_enable(void) {
+    return config.findmy_enable;
+}
+
+void settings_set_findmy_enable(bool enable) {
+    config.findmy_enable = enable;
+}
+
+uint8_t *settings_get_findmy_key(void) {
+    return config.findmy_key;
+}
+
+void settings_set_findmy_key(const uint8_t *key) {
+    memcpy(config.findmy_key, key, SETTINGS_FINDMY_KEY_LEN);
 }

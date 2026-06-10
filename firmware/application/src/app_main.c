@@ -28,6 +28,7 @@ NRF_LOG_MODULE_REGISTER();
 
 #include "app_cmd.h"
 #include "ble_main.h"
+#include "findmy.h"
 #include "bsp_delay.h"
 #include "bsp_time.h"
 #include "bsp_wdt.h"
@@ -1023,6 +1024,8 @@ int main(void) {
 
     check_wakeup_src();       // Detect wake-up source and decide BLE broadcast and subsequent hibernation action according to the wake-up source
     tag_mode_enter();         // Enter card emulation mode by default
+
+    findmy_restore_from_settings(); // Resume FindMy beacon if it was persisted/enabled
 
     // usbd event listener
     APP_ERROR_CHECK(app_usbd_power_events_enable());

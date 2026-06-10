@@ -5,12 +5,13 @@
 
 #include "utils.h"
 
-#define SETTINGS_CURRENT_VERSION 6
+#define SETTINGS_CURRENT_VERSION 7
 #define SETTINGS_SLEEP_TIMEOUT_DEFAULT_S 8   // default wake timeout in seconds (matches SLEEP_DELAY_MS_BUTTON_WAKEUP)
 #define SETTINGS_SLEEP_TIMEOUT_MIN_S      5
 #define SETTINGS_SLEEP_TIMEOUT_MAX_S      60
 #define BLE_PAIRING_KEY_LEN 6
 #define DEFAULT_BLE_PAIRING_KEY "123456"  // length must == 6
+#define SETTINGS_FINDMY_KEY_LEN 28        // Apple offline-finding public key length
 
 typedef enum {
     SettingsAnimationModeFull = 0U,
@@ -41,7 +42,8 @@ typedef struct ALIGN_U32 {
     // 1 byte
     uint8_t animation_config : 2;
     uint8_t ble_pairing_enable : 1;
-    uint8_t reserved0 : 5; // If you are add switch field, reallocating me.
+    uint8_t findmy_enable : 1; // add on version7
+    uint8_t reserved0 : 4; // If you are add switch field, reallocating me.
 
     // 1 byte
     uint8_t button_a_press : 4;
@@ -56,6 +58,9 @@ typedef struct ALIGN_U32 {
 
     // 1 byte (add on version6)
     uint8_t sleep_timeout; // wake timeout in seconds after button wakeup
+
+    // 28 bytes (add on version7) - FindMy/offline-finding public key
+    uint8_t findmy_key[SETTINGS_FINDMY_KEY_LEN];
 
     /*
      * Warning !!!!!!!!!!!!!!!!!!!!!! <-------------
@@ -84,4 +89,9 @@ bool settings_get_ble_pairing_enable_first_load(void);
 uint32_t settings_get_sleep_timeout(void);
 void settings_set_sleep_timeout(uint8_t seconds);
 void settings_init_sleep_timeout_config(void);
+bool settings_get_findmy_enable(void);
+void settings_set_findmy_enable(bool enable);
+uint8_t *settings_get_findmy_key(void);
+void settings_set_findmy_key(const uint8_t *key);
+void settings_init_findmy_config(void);
 #endif

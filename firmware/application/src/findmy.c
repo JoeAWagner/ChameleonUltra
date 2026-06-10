@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "ble_main.h"
+#include "settings.h"
 
 #define NRF_LOG_MODULE_NAME findmy
 #include "nrf_log.h"
@@ -113,4 +114,17 @@ uint32_t findmy_stop(void) {
 
 bool findmy_is_running(void) {
     return m_running;
+}
+
+void findmy_restore_from_settings(void) {
+    if (!settings_get_findmy_enable()) {
+        return;
+    }
+    findmy_set_key(settings_get_findmy_key());
+    if (!findmy_has_key()) {
+        // Enable flag set but no key stored; nothing to advertise.
+        return;
+    }
+    NRF_LOG_INFO("Restoring FindMy beacon from settings");
+    findmy_start();
 }

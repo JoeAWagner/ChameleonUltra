@@ -242,6 +242,9 @@ static data_frame_tx_t *cmd_processor_findmy_set_key(uint16_t cmd, uint16_t stat
         return data_frame_make(cmd, STATUS_PAR_ERR, 0, NULL);
     }
     findmy_set_key(data);
+    // Persist the key so the beacon survives reboot / battery death.
+    settings_set_findmy_key(data);
+    settings_save_config();
     return data_frame_make(cmd, STATUS_SUCCESS, 0, NULL);
 }
 
@@ -258,6 +261,11 @@ static data_frame_tx_t *cmd_processor_findmy_set_enable(uint16_t cmd, uint16_t s
         err = findmy_start();
     } else {
         err = findmy_stop();
+    }
+    if (err == NRF_SUCCESS) {
+        // Persist enable state so the beacon auto-resumes after a reboot.
+        settings_set_findmy_enable(data[0]);
+        settings_save_config();
     }
     return data_frame_make(cmd, err == NRF_SUCCESS ? STATUS_SUCCESS : STATUS_CMD_ERR, 0, NULL);
 }

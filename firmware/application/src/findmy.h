@@ -31,4 +31,10 @@ uint32_t findmy_stop(void);
 /**@brief Returns true while the FindMy beacon is active. */
 bool findmy_is_running(void);
 
+/**@brief Restore the beacon from persisted settings on boot.
+ *
+ * If the FindMy enable flag is set and a key is stored, loads the key and
+ * starts advertising. Call once after BLE init. */
+void findmy_restore_from_settings(void);
+
 #endif
