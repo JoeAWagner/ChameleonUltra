@@ -620,15 +620,16 @@ void advertising_stop(void) {
 #define FINDMY_ADV_INTERVAL  MSEC_TO_UNITS(2000, UNIT_0_625_MS)  // 2 s, AirTag-like
 
 static uint8_t          m_findmy_adv_buf[BLE_GAP_ADV_SET_DATA_SIZE_MAX];
+static uint8_t          m_findmy_scanrsp_buf[BLE_GAP_ADV_SET_DATA_SIZE_MAX];
 static ble_gap_adv_data_t m_findmy_adv_data;
 static ble_gap_addr_t   m_saved_addr;
 static bool             m_findmy_addr_saved = false;
 static bool             m_findmy_active = false;
 
-uint32_t ble_findmy_advertising_start(const uint8_t *addr6, const uint8_t *advdata, uint8_t advdata_len) {
+uint32_t ble_findmy_advertising_start(const uint8_t *addr6, const uint8_t *advdata, uint8_t advdata_len, const uint8_t *scanrsp, uint8_t scanrsp_len) {
     ret_code_t err_code;
 
-    if (advdata_len > sizeof(m_findmy_adv_buf)) {
+    if (advdata_len > sizeof(m_findmy_adv_buf) || scanrsp_len > sizeof(m_findmy_scanrsp_buf)) {
         return NRF_ERROR_DATA_SIZE;
     }
     // Changing the GAP address is rejected while a connection is up.
@@ -657,15 +658,23 @@ uint32_t ble_findmy_advertising_start(const uint8_t *addr6, const uint8_t *advda
         return err_code;
     }
 
-    // SoftDevice keeps a reference to the buffer, so copy into our static store.
+    // SoftDevice keeps a reference to the buffers, so copy into our static store.
     memcpy(m_findmy_adv_buf, advdata, advdata_len);
     memset(&m_findmy_adv_data, 0, sizeof(m_findmy_adv_data));
     m_findmy_adv_data.adv_data.p_data = m_findmy_adv_buf;
     m_findmy_adv_data.adv_data.len    = advdata_len;
+    if (scanrsp_len > 0) {
+        memcpy(m_findmy_scanrsp_buf, scanrsp, scanrsp_len);
+        m_findmy_adv_data.scan_rsp_data.p_data = m_findmy_scanrsp_buf;
+        m_findmy_adv_data.scan_rsp_data.len    = scanrsp_len;
+    }
 
     ble_gap_adv_params_t params;
     memset(&params, 0, sizeof(params));
-    params.properties.type = BLE_GAP_ADV_TYPE_NONCONNECTABLE_NONSCANNABLE_UNDIRECTED;
+    // Scannable when a scan response (name) is provided, otherwise non-scannable.
+    params.properties.type = (scanrsp_len > 0)
+                             ? BLE_GAP_ADV_TYPE_NONCONNECTABLE_SCANNABLE_UNDIRECTED
+                             : BLE_GAP_ADV_TYPE_NONCONNECTABLE_NONSCANNABLE_UNDIRECTED;
     params.p_peer_addr     = NULL;
     params.filter_policy   = BLE_GAP_ADV_FP_ANY;
     params.interval        = FINDMY_ADV_INTERVAL;

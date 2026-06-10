@@ -13,6 +13,13 @@ NRF_LOG_MODULE_REGISTER();
 // AD structure that fills a full 31-byte legacy advertising payload.
 #define FINDMY_ADV_LEN 31
 
+// TESTING AID: a Complete Local Name carried in the scan response so the beacon
+// is easy to spot in a generic BLE scanner (e.g. nRF Connect). The primary
+// advertisement is unchanged, so the FindMy network still works. Set to "" (or
+// drop the scan response) for production -- real FindMy accessories are nameless
+// and non-scannable for stealth.
+#define FINDMY_TEST_SCAN_NAME "CU-FindMy"
+
 static uint8_t m_pubkey[FINDMY_PUBKEY_LEN];
 static bool    m_running = false;
 
@@ -60,14 +67,32 @@ static void findmy_build_advdata(uint8_t *buf) {
     buf[i++] = 0x00;              // hint
 }
 
+// TESTING AID: build a scan response carrying a Complete Local Name AD so the
+// beacon is identifiable in a BLE scanner. Returns the length (0 if name empty).
+static uint8_t findmy_build_scanrsp(uint8_t *buf) {
+    const char *name = FINDMY_TEST_SCAN_NAME;
+    uint8_t name_len = (uint8_t) strlen(name);
+    if (name_len == 0) {
+        return 0;
+    }
+    uint8_t i = 0;
+    buf[i++] = name_len + 1;  // AD length (type + name)
+    buf[i++] = 0x09;          // AD type: Complete Local Name
+    memcpy(&buf[i], name, name_len);
+    i += name_len;
+    return i;
+}
+
 uint32_t findmy_start(void) {
     uint8_t addr6[6];
     uint8_t advdata[FINDMY_ADV_LEN];
+    uint8_t scanrsp[31];
 
     findmy_build_addr(addr6);
     findmy_build_advdata(advdata);
+    uint8_t scanrsp_len = findmy_build_scanrsp(scanrsp);
 
-    uint32_t err = ble_findmy_advertising_start(addr6, advdata, FINDMY_ADV_LEN);
+    uint32_t err = ble_findmy_advertising_start(addr6, advdata, FINDMY_ADV_LEN, scanrsp, scanrsp_len);
     if (err == NRF_SUCCESS) {
         m_running = true;
         NRF_LOG_INFO("FindMy beacon started");
