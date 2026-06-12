@@ -5759,6 +5759,78 @@ class HFMFUEDetect(SlotIndexArgsAndGoUnit, DeviceRequiredUnit):
             print(f"{actual_index:3d}: {color_string((CY, password.upper()))}")
 
 
+@lf.command("search")
+class LFSearch(ReaderRequiredUnit):
+    def args_parser(self) -> ArgumentParserNoExit:
+        parser = ArgumentParserNoExit()
+        parser.description = ("Autodetect a 125 kHz LF tag by trying every supported demodulator "
+                              "(EM410x, HID Prox, ioProx, Viking, PAC) and reporting each match.")
+        return parser
+
+    def on_exec(self, args: argparse.Namespace):
+        found = False
+
+        # EM410x
+        try:
+            tag_type, uid = self.cmd.em410x_scan()
+            print(f"{color_string((CG, '[+] EM410x'))} ({TagSpecificType(tag_type)}): "
+                  f"{color_string((CG, uid.hex().upper()))}")
+            found = True
+        except UnexpectedResponseError:
+            pass
+
+        # HID Prox (format 0 = autodetect)
+        try:
+            (fmt, fc, cn1, cn2, il, oem) = self.cmd.hidprox_scan(0)
+            cn = (cn1 << 32) + cn2
+            extras = []
+            if fc:
+                extras.append(f"FC={fc}")
+            if il:
+                extras.append(f"IL={il}")
+            if oem:
+                extras.append(f"OEM={oem}")
+            extra_str = ("  " + " ".join(extras)) if extras else ""
+            print(f"{color_string((CG, '[+] HID Prox'))} ({HIDFormat(fmt)}): "
+                  f"{color_string((CG, f'CN={cn}'))}{extra_str}")
+            found = True
+        except UnexpectedResponseError:
+            pass
+
+        # ioProx
+        try:
+            data = self.cmd.ioprox_scan()
+            version, facility, number, raw = data[0], data[1], data[2], data[3]
+            print(f"{color_string((CG, '[+] ioProx'))}: "
+                  f"{color_string((CG, f'ver={version} FC={facility} CN={number}'))}  raw={raw.hex().upper()}")
+            found = True
+        except UnexpectedResponseError:
+            pass
+
+        # Viking
+        try:
+            uid = self.cmd.viking_scan()
+            print(f"{color_string((CG, '[+] Viking'))}: {color_string((CG, uid.hex().upper()))}")
+            found = True
+        except UnexpectedResponseError:
+            pass
+
+        # PAC/Stanley (card ID is ASCII)
+        try:
+            cid = self.cmd.pac_scan()
+            try:
+                cid_str = cid.decode('ascii')
+            except UnicodeDecodeError:
+                cid_str = cid.hex().upper()
+            print(f"{color_string((CG, '[+] PAC/Stanley'))}: {color_string((CG, cid_str))}")
+            found = True
+        except UnexpectedResponseError:
+            pass
+
+        if not found:
+            print(color_string((CR, "[-] No known LF tag found. Make sure the card is on the antenna.")))
+
+
 @lf_em_410x.command("read")
 class LFEMRead(ReaderRequiredUnit):
     def args_parser(self) -> ArgumentParserNoExit:
